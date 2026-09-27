@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Duzzies Job Hunter</title>
+<style>
+:root{color-scheme:dark;--bg:#070a10;--card:#101722;--line:#253044;--text:#f4f7ff;--muted:#9aa8bd;--accent:#6d5dfc;--good:#27c47d;--danger:#d95c68}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(145deg,#070a10,#0b1020);color:var(--text);font:15px system-ui,-apple-system,Segoe UI,sans-serif}
+.wrap{max-width:1100px;margin:auto;padding:18px}.top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0 20px}
+.brand{font-weight:900;font-size:24px}.live{font-size:12px;background:#12351f;color:#79f4aa;border-radius:99px;padding:6px 9px;margin-left:7px}
+.card{background:rgba(16,23,34,.94);border:1px solid var(--line);border-radius:18px;padding:18px;margin:14px 0;box-shadow:0 10px 30px #0003}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.stat{padding:15px;border:1px solid var(--line);border-radius:14px;background:#0b111b}.num{font-size:28px;font-weight:900}.muted{color:var(--muted)}
+button,a{border:0;border-radius:10px;padding:10px 13px;font-weight:750;text-decoration:none;cursor:pointer}button{background:var(--accent);color:white}.secondary{background:#283244;color:white}.danger{background:#40232a;color:#ff9ca7}.good{background:#135c40;color:#b4ffd7}
+input{width:100%;max-width:420px;background:#080d15;color:white;border:1px solid #39465c;border-radius:10px;padding:12px;margin:7px 0}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.job{border-top:1px solid var(--line);padding:17px 0}.job:first-child{border-top:0}.score{font-weight:900}.badge{display:inline-block;padding:5px 8px;border-radius:8px;background:#202a3b;color:#c8d3e7;font-size:12px}
+pre{white-space:pre-wrap;background:#080d15;border:1px solid var(--line);border-radius:10px;padding:12px;max-height:300px;overflow:auto}
+.hidden{display:none}.notice{padding:12px;border-radius:12px;background:#171f2d;color:#c9d4e7}.error{background:#351d24;color:#ffb4bd}.ok{background:#123324;color:#b7ffd9}
+@media(max-width:760px){.grid{grid-template-columns:1fr}.top{align-items:flex-start}.brand{font-size:20px}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="top"><div class="brand">🤖 Duzzies Job Hunter <span class="live">● LIVE</span></div><button id="signout" class="secondary hidden">Sign out</button></header>
+
+<section id="login" class="card">
+<h2>Secure sign in</h2><p class="muted">Sign in with the email attached to your Duzzies Job Hunter profile.</p>
+<input id="email" type="email" placeholder="Your email address">
+<button id="send">Send sign-in link</button><p id="loginmsg" class="muted"></p>
+</section>
+
+<main id="app" class="hidden">
+<section class="card">
+<h2>Job Hunter Control Centre</h2>
+<p class="muted">Scan vacancies, match them to your profile, prepare applications and review them before anything is submitted.</p>
+<div class="actions">
+<button id="scan">🔎 Scan jobs now</button><button id="match" class="secondary">🧠 Match jobs</button><button id="refresh" class="secondary">↻ Refresh</button>
+</div><p id="status" class="muted"></p>
+</section>
+
+<section class="grid">
+<div class="stat"><div class="muted">Vacancies matched</div><div id="matched" class="num">—</div></div>
+<div class="stat"><div class="muted">Best match</div><div id="best" class="num">—</div></div>
+<div class="stat"><div class="muted">Applications waiting</div><div id="pending" class="num">—</div></div>
+</section>
+
+<section class="card"><h2>Matched vacancies</h2><div id="jobs"><div class="muted">Loading…</div></div></section>
+<section class="card"><h2>Application approval queue</h2><p class="muted">Approving here only changes the application status. It does not submit an external application.</p><div id="applications"><div class="muted">Loading…</div></div></section>
+</main>
+</div>
+
+<script>
+const SUPA='https://zapnsrfnlmvonozyhnow.supabase.co';
+const KEY='sb_publishable_oCCu3pRPKgs7oaCoUstxTw_2DCdeKZa';
+let token=localStorage.getItem('dh_token');
+
+const $=id=>document.getElementById(id);
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function headers(){return {'Authorization':'Bearer '+token,'apikey':KEY,'Content-Type':'application/json'}}
+async function call(fn,opts={}){return fetch(SUPA+'/functions/v1/'+fn,{...opts,headers:{...headers(),...(opts.headers||{})}})}
+async function bootstrap(){
+ if(!token){$('login').classList.remove('hidden');$('app').classList.add('hidden');return}
+ const r=await fetch(SUPA+'/functions/v1/job-hunter-live?action=bootstrap',{headers:headers()});
+ if(!r.ok){localStorage.removeItem('dh_token');token=null;$('loginmsg').textContent='Your sign-in link has expired. Please request another.';return}
+ $('login').classList.add('hidden');$('app').classList.remove('hidden');$('signout').classList.remove('hidden');await refresh()
+}
+async function pending(){
+ const r=await fetch(SUPA+'/functions/v1/job-hunter-live?action=pending',{headers:headers()}); if(!r.ok)return [];
+ const d=await r.json(); return d.applications||[]
+}
+async function refresh(){
+ $('status').textContent='Refreshing…';
+ const apps=await pending(); $('pending').textContent=apps.length;
+ $('applications').innerHTML=apps.length?apps.map(a=>`<div class="job">
+<h3>${esc(a.jobs?.title||'Untitled')}</h3><div class="muted">${esc(a.jobs?.company||'')} · ${esc(a.jobs?.location||'')}</div>
+<p>${esc(a.notes||'')}</p><details><summary>View tailored CV</summary><pre>${esc(a.tailored_cv||'')}</pre></details>
+<details><summary>View cover letter</summary><pre>${esc(a.cover_letter||'')}</pre></details>
+<div class="actions"><button class="good" onclick="statusChange('${a.id}','approved')">Approve</button><button class="danger" onclick="statusChange('${a.id}','rejected')">Reject</button>${a.application_url?`<a class="secondary" href="${esc(a.application_url)}" target="_blank" rel="noopener">Open vacancy</a>`:''}</div>
+</div>`).join(''):'<div class="notice">No applications waiting for approval.</div>';
+
+ const r=await call('ai-job-matcher',{method:'POST',body:JSON.stringify({})});
+ if(r.ok){const d=await r.json(); const rows=d.results||[];$('matched').textContent=d.matched??rows.length;$('best').textContent=rows.length?Math.max(...rows.map(x=>Number(x.score)||0))+'/100':'—';
+ $('jobs').innerHTML=rows.length?rows.map(x=>`<div class="job"><h3>${esc(x.title||x.job?.title||'Vacancy')}</h3><div class="muted">${esc(x.company||x.job?.company||'')} · ${esc(x.location||x.job?.location||'')}</div><p class="score">Match: ${esc(x.score)}/100</p><p>${esc(Array.isArray(x.reasons)?x.reasons.join(' · '):x.reason||'')}</p><div class="actions">${(x.url||x.job?.url)?`<a class="secondary" href="${esc(x.url||x.job?.url)}" target="_blank" rel="noopener">Open vacancy</a>`:''}</div></div>`).join(''):'<div class="notice">No detailed matches yet. Run a scan, then Match jobs.</div>'}
+ else $('jobs').innerHTML='<div class="notice">Matching is temporarily unavailable. You can still scan and try again.</div>';
+ $('status').textContent='Ready';
+}
+async function statusChange(id,status){
+ if(!confirm(status==='approved'?'Approve this application?':'Reject this application?'))return;
+ const r=await fetch(SUPA+'/functions/v1/job-hunter-live',{method:'POST',headers:headers(),body:JSON.stringify({application_id:id,status})});
+ if(!r.ok){alert('Could not update application.');return} refresh()
+}
+$('send').onclick=async()=>{
+ const email=$('email').value.trim();if(!email)return;
+ $('loginmsg').textContent='Sending sign-in link…';
+ const r=await fetch(SUPA+'/auth/v1/otp',{method:'POST',headers:{apikey:KEY,'Content-Type':'application/json'},body:JSON.stringify({email,create_user:true})});
+ $('loginmsg').textContent=r.ok?'Check your email for the secure sign-in link.':'Could not send the sign-in link.';
+}
+$('scan').onclick=async()=>{ $('status').textContent='Scanning vacancies…'; const r=await call('job-scan',{method:'POST',body:JSON.stringify({})}); $('status').textContent=r.ok?'Scan complete. Running refresh…':'Scan failed — try again.'; if(r.ok)refresh() }
+$('match').onclick=async()=>{ $('status').textContent='Matching vacancies…'; const r=await call('ai-job-matcher',{method:'POST',body:JSON.stringify({})}); $('status').textContent=r.ok?'Matching complete.':'Matching failed — try again.'; refresh() }
+$('refresh').onclick=refresh;
+$('signout').onclick=()=>{localStorage.removeItem('dh_token');location.reload()}
+(function(){const p=new URLSearchParams(location.hash.slice(1));const t=p.get('access_token');if(t){localStorage.setItem('dh_token',t);history.replaceState({},'',location.pathname+location.search);token=t}bootstrap()})()
+</script>
+</body></html>
