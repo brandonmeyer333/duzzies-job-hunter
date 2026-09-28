@@ -92,7 +92,7 @@ async function statusChange(id,status){
 $('send').onclick=async()=>{
  const email=$('email').value.trim();if(!email)return;
  $('loginmsg').textContent='Sending sign-in link…';
- const r=await fetch(SUPA+'/auth/v1/otp',{method:'POST',headers:{apikey:KEY,'Content-Type':'application/json'},body:JSON.stringify({email,create_user:true})});
+ const r=await fetch(SUPA+'/auth/v1/otp',{method:'POST',headers:{apikey:KEY,'Content-Type':'application/json'},body:JSON.stringify({email,create_user:true,redirect_to:'https://duzzies-job-hunter.onrender.com/'})});
  $('loginmsg').textContent=r.ok?'Check your email for the secure sign-in link.':'Could not send the sign-in link.';
 }
 $('scan').onclick=async()=>{ $('status').textContent='Scanning vacancies…'; const r=await call('job-scan',{method:'POST',body:JSON.stringify({})}); $('status').textContent=r.ok?'Scan complete. Running refresh…':'Scan failed — try again.'; if(r.ok)refresh() }
